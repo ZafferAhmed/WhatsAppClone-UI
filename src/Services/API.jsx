@@ -1,6 +1,8 @@
 import axios from "axios";
 import { API_URL } from "../Utilities/Constants";
 
+axios.defaults.withCredentials = true;
+
 export const registerUser = async (userData) => {
   return await axios.post(`${API_URL}/register-or-login`, userData);
 };
