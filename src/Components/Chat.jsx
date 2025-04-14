@@ -18,6 +18,7 @@ const Chat = ({ senderId, receiverId }) => {
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [isInputEmpty, setIsInputEmpty] = useState(true);
   const messagesEndRef = useRef(null);
+  const [lastSentTime, setLastSentTime] = useState(0);
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp?._seconds) return "";
@@ -55,7 +56,14 @@ const Chat = ({ senderId, receiverId }) => {
   const handleSendMessage = async () => {
     if (isInputEmpty) return;
 
+    const currentTime = Date.now();
+    if (currentTime - lastSentTime < 1000) {
+      toast.error("Please wait a moment before sending another message");
+      return;
+    }
+
     setLoading(true);
+    const tempId = Date.now();
     try {
       let fileUrl = null;
       if (file) {
@@ -65,25 +73,31 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
+      const tempId = Date.now();
       const msg = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
+        timestamp: { _seconds: Math.floor(currentTime / 1000) },
+        tempId: tempId,
+        isOptimistic: true,
       };
 
-      await sendMessage(msg);
-      socket.emit("sendMessage", msg);
+      setMessages((prev) => [...prev, msg]);
       setNewMessage("");
       setIsInputEmpty(true);
+      setLastSentTime(currentTime);
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          ...msg,
-          timestamp: { _seconds: Math.floor(Date.now() / 1000) },
-        },
-      ]);
+      const response = await sendMessage(msg);
+      const serverMsg = response.data;
+
+      setMessages((prev) =>
+        prev.map((m) => (m.tempId === tempId ? { ...serverMsg, tempId } : m))
+      );
+
+      socket.emit("sendMessage", serverMsg);
     } catch (error) {
+      setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
     } finally {
       setLoading(false);
@@ -119,14 +133,18 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      const isRelevantMessage =
-        (msg.senderId === senderId?.uid &&
-          msg.receiverId === receiverId?.uid) ||
-        (msg.senderId === receiverId?.uid && msg.receiverId === senderId?.uid);
+      setMessages((prev) => {
+        const exists = prev.some(
+          (m) =>
+            (m.tempId && msg.tempId && m.tempId === msg.tempId) ||
+            (m._id && msg._id && m._id === msg._id) ||
+            (m.message === msg.message &&
+              m.senderId === msg.senderId &&
+              m.timestamp?._seconds === msg.timestamp?._seconds)
+        );
 
-      if (isRelevantMessage) {
-        setMessages((prev) => [...prev, msg]);
-      }
+        return exists ? prev : [...prev, msg];
+      });
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
@@ -188,7 +206,7 @@ const Chat = ({ senderId, receiverId }) => {
                 lastDisplayedDate = messageDate;
 
                 return (
-                  <div key={`${msg.timestamp?._seconds || index}-${index}`}>
+                  <div key={msg.tempId || msg._id || index}>
                     {shouldShowDate && (
                       <div className="text-center text-gray-500 text-xs my-3">
                         {messageDate} - {formatTimestamp(msg.timestamp)}
