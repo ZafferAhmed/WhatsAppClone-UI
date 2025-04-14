@@ -21,6 +21,7 @@ const Register = () => {
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isFormValid, setIsFormValid] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,9 +31,15 @@ const Register = () => {
     }
   }, [navigate]);
 
+  // Check form validity whenever form data changes
+  useEffect(() => {
+    const isValid = formData.email && formData.password && formData.name;
+    setIsFormValid(!!isValid);
+  }, [formData]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password || !formData.name) {
+    if (!isFormValid) {
       toast.error("Please fill all the fields.");
       return;
     }
@@ -58,6 +65,13 @@ const Register = () => {
     }
   };
 
+  // Handle Enter key press on form
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && isFormValid) {
+      handleSubmit(e);
+    }
+  };
+
   return (
     <>
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-green-600 p-4 relative">
@@ -73,76 +87,87 @@ const Register = () => {
             Create Account
           </h2>
 
-          <div className="mb-4 relative">
-            <label className="block text-gray-600 font-medium mb-1">Name</label>
-            <div className="flex items-center border border-gray-300 rounded-lg p-3">
-              <FaUser className="text-gray-500 mr-2" />
-              <input
-                type="text"
-                placeholder="Enter your name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="w-full outline-none bg-transparent"
-              />
+          <form onSubmit={handleSubmit} onKeyDown={handleKeyPress}>
+            <div className="mb-4 relative">
+              <label className="block text-gray-600 font-medium mb-1">
+                Name
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-lg p-3">
+                <FaUser className="text-gray-500 mr-2" />
+                <input
+                  type="text"
+                  placeholder="Enter your name"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full outline-none bg-transparent"
+                  required
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="mb-4 relative">
-            <label className="block text-gray-600 font-medium mb-1">
-              Email
-            </label>
-            <div className="flex items-center border border-gray-300 rounded-lg p-3">
-              <FaEnvelope className="text-gray-500 mr-2" />
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                className="w-full outline-none bg-transparent"
-              />
+            <div className="mb-4 relative">
+              <label className="block text-gray-600 font-medium mb-1">
+                Email
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-lg p-3">
+                <FaEnvelope className="text-gray-500 mr-2" />
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  className="w-full outline-none bg-transparent"
+                  required
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="mb-6 relative">
-            <label className="block text-gray-600 font-medium mb-1">
-              Password
-            </label>
-            <div className="flex items-center border border-gray-300 rounded-lg p-3 relative">
-              <FaLock className="text-gray-500 mr-2" />
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                className="w-full outline-none bg-transparent"
-              />
-              <button
-                type="button"
-                className="absolute right-3 text-gray-500"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <FaEyeSlash /> : <FaEye />}
-              </button>
+            <div className="mb-6 relative">
+              <label className="block text-gray-600 font-medium mb-1">
+                Password
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-lg p-3 relative">
+                <FaLock className="text-gray-500 mr-2" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  className="w-full outline-none bg-transparent"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 text-gray-500"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <button
-            onClick={handleSubmit}
-            className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold text-lg hover:bg-green-600 transition-all duration-300 flex justify-center items-center"
-            disabled={loading}
-          >
-            {loading ? (
-              <ImSpinner2 className="animate-spin text-xl" />
-            ) : (
-              "Register"
-            )}
-          </button>
+            <button
+              type="submit"
+              className={`w-full py-3 rounded-lg font-semibold text-lg transition-all duration-300 flex justify-center items-center ${
+                isFormValid
+                  ? "bg-green-500 text-white hover:bg-green-600"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+              disabled={loading || !isFormValid}
+            >
+              {loading ? (
+                <ImSpinner2 className="animate-spin text-xl" />
+              ) : (
+                "Register"
+              )}
+            </button>
+          </form>
         </div>
 
         <Toaster position="bottom-center" toastOptions={{ duration: 1000 }} />

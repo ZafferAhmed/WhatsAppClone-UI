@@ -16,6 +16,7 @@ const Chat = ({ senderId, receiverId }) => {
   const [filePreview, setFilePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(socket.connected);
+  const [isInputEmpty, setIsInputEmpty] = useState(true);
   const messagesEndRef = useRef(null);
 
   const formatTimestamp = (timestamp) => {
@@ -45,11 +46,14 @@ const Chat = ({ senderId, receiverId }) => {
     }
   }, [senderId, receiverId]);
 
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setNewMessage(value);
+    setIsInputEmpty(value.trim() === "" && !file);
+  };
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() && !file) {
-      toast.error("Please enter a message or upload a file.");
-      return;
-    }
+    if (isInputEmpty) return;
 
     setLoading(true);
     try {
@@ -70,11 +74,14 @@ const Chat = ({ senderId, receiverId }) => {
       await sendMessage(msg);
       socket.emit("sendMessage", msg);
       setNewMessage("");
+      setIsInputEmpty(true);
 
-      // Optimistically update UI
       setMessages((prev) => [
         ...prev,
-        { ...msg, timestamp: { _seconds: Math.floor(Date.now() / 1000) } },
+        {
+          ...msg,
+          timestamp: { _seconds: Math.floor(Date.now() / 1000) },
+        },
       ]);
     } catch (error) {
       toast.error("Error sending message: " + error.message);
@@ -83,26 +90,25 @@ const Chat = ({ senderId, receiverId }) => {
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !isInputEmpty) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   const { getRootProps, getInputProps } = useDropzone({
     accept: "image/*",
     onDrop: (acceptedFiles) => {
       setFile(acceptedFiles[0]);
       setFilePreview(URL.createObjectURL(acceptedFiles[0]));
+      setIsInputEmpty(false);
     },
   });
 
   useEffect(() => {
-    // Socket connection handlers
-    const onConnect = () => {
-      setIsConnected(true);
-      console.log("Socket connected");
-    };
-
-    const onDisconnect = () => {
-      setIsConnected(false);
-      console.log("Socket disconnected");
-    };
-
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
     const onError = (error) => {
       console.error("Socket error:", error);
       toast.error("Connection error. Please refresh.");
@@ -112,10 +118,7 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("disconnect", onDisconnect);
     socket.on("error", onError);
 
-    // Message handler
     const handleReceiveMessage = (msg) => {
-      console.log("Received message:", msg);
-
       const isRelevantMessage =
         (msg.senderId === senderId?.uid &&
           msg.receiverId === receiverId?.uid) ||
@@ -127,8 +130,6 @@ const Chat = ({ senderId, receiverId }) => {
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
-
-    // Initial data fetch
     fetchMessages();
 
     return () => {
@@ -139,18 +140,9 @@ const Chat = ({ senderId, receiverId }) => {
     };
   }, [senderId?.uid, receiverId?.uid, fetchMessages]);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  // Handle Enter key press
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
 
   return (
     <>
@@ -247,7 +239,11 @@ const Chat = ({ senderId, receiverId }) => {
               className="w-24 h-24 rounded-md border"
             />
             <button
-              onClick={() => setFilePreview(null)}
+              onClick={() => {
+                setFilePreview(null);
+                setFile(null);
+                setIsInputEmpty(newMessage.trim() === "");
+              }}
               className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
             >
               <IoMdClose size={16} className="text-white" aria-hidden />
@@ -259,7 +255,7 @@ const Chat = ({ senderId, receiverId }) => {
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             className="flex-1 p-2 border rounded focus:outline-none"
             placeholder="Type a message..."
@@ -273,13 +269,17 @@ const Chat = ({ senderId, receiverId }) => {
           </div>
           <button
             onClick={handleSendMessage}
-            className="bg-green-500 text-white p-2 rounded hover:bg-green-600 flex justify-center items-center transition duration-500 ease-in-out"
-            disabled={loading || !isConnected}
+            className={`p-2 rounded-lg flex justify-center items-center transition duration-200 ${
+              isInputEmpty || !isConnected
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-green-500 hover:bg-green-600 text-white"
+            }`}
+            disabled={loading || !isConnected || isInputEmpty}
           >
             {loading ? (
-              <BsFillSendFill />
+              <BsFillSendFill className="animate-pulse" />
             ) : (
-              <LuSendHorizontal size={20} aria-hidden />
+              <LuSendHorizontal size={20} />
             )}
           </button>
         </div>
