@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { sendMessage, getMessages, uploadFile } from "../Services/API";
 import { useDropzone } from "react-dropzone";
 import toast, { Toaster } from "react-hot-toast";
@@ -15,6 +15,8 @@ const Chat = ({ senderId, receiverId }) => {
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(socket.connected);
+  const messagesEndRef = useRef(null);
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp?._seconds) return "";
@@ -68,7 +70,12 @@ const Chat = ({ senderId, receiverId }) => {
       await sendMessage(msg);
       socket.emit("sendMessage", msg);
       setNewMessage("");
-      fetchMessages();
+
+      // Optimistically update UI
+      setMessages((prev) => [
+        ...prev,
+        { ...msg, timestamp: { _seconds: Math.floor(Date.now() / 1000) } },
+      ]);
     } catch (error) {
       toast.error("Error sending message: " + error.message);
     } finally {
@@ -85,23 +92,65 @@ const Chat = ({ senderId, receiverId }) => {
   });
 
   useEffect(() => {
-    fetchMessages();
+    // Socket connection handlers
+    const onConnect = () => {
+      setIsConnected(true);
+      console.log("Socket connected");
+    };
 
-    socket.on("receiveMessage", (msg) => {
-      console.log('Received message:', msg);
-      
-      if (
-        (msg.senderId === senderId.uid && msg.receiverId === receiverId.uid) ||
-        (msg.senderId === receiverId.uid && msg.receiverId === senderId.uid)
-      ) {
+    const onDisconnect = () => {
+      setIsConnected(false);
+      console.log("Socket disconnected");
+    };
+
+    const onError = (error) => {
+      console.error("Socket error:", error);
+      toast.error("Connection error. Please refresh.");
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("error", onError);
+
+    // Message handler
+    const handleReceiveMessage = (msg) => {
+      console.log("Received message:", msg);
+
+      const isRelevantMessage =
+        (msg.senderId === senderId?.uid &&
+          msg.receiverId === receiverId?.uid) ||
+        (msg.senderId === receiverId?.uid && msg.receiverId === senderId?.uid);
+
+      if (isRelevantMessage) {
         setMessages((prev) => [...prev, msg]);
       }
-    });
+    };
+
+    socket.on("receiveMessage", handleReceiveMessage);
+
+    // Initial data fetch
+    fetchMessages();
 
     return () => {
-      socket.off("receiveMessage");
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("error", onError);
+      socket.off("receiveMessage", handleReceiveMessage);
     };
-  }, [fetchMessages, senderId, receiverId]);
+  }, [senderId?.uid, receiverId?.uid, fetchMessages]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Handle Enter key press
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   return (
     <>
@@ -116,11 +165,20 @@ const Chat = ({ senderId, receiverId }) => {
                 <div className="text-base font-semibold text-gray-900">
                   {receiverId.name}
                 </div>
-                <div className="text-xs text-green-500 font-medium flex items-center">
+                <div className="text-xs font-medium flex items-center">
                   <span>
-                    <GoDotFill className="text-green-500" size={16} />
+                    <GoDotFill
+                      className={
+                        isConnected ? "text-green-500" : "text-gray-500"
+                      }
+                      size={16}
+                    />
                   </span>
-                  <span>Online</span>
+                  <span
+                    className={isConnected ? "text-green-500" : "text-gray-500"}
+                  >
+                    {isConnected ? "Online" : "Offline"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -138,7 +196,7 @@ const Chat = ({ senderId, receiverId }) => {
                 lastDisplayedDate = messageDate;
 
                 return (
-                  <div key={index}>
+                  <div key={`${msg.timestamp?._seconds || index}-${index}`}>
                     {shouldShowDate && (
                       <div className="text-center text-gray-500 text-xs my-3">
                         {messageDate} - {formatTimestamp(msg.timestamp)}
@@ -176,6 +234,7 @@ const Chat = ({ senderId, receiverId }) => {
                   </div>
                 );
               })}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>
@@ -201,6 +260,7 @@ const Chat = ({ senderId, receiverId }) => {
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
             className="flex-1 p-2 border rounded focus:outline-none"
             placeholder="Type a message..."
           />
@@ -214,7 +274,7 @@ const Chat = ({ senderId, receiverId }) => {
           <button
             onClick={handleSendMessage}
             className="bg-green-500 text-white p-2 rounded hover:bg-green-600 flex justify-center items-center transition duration-500 ease-in-out"
-            disabled={loading}
+            disabled={loading || !isConnected}
           >
             {loading ? (
               <BsFillSendFill />
