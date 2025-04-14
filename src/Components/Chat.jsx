@@ -7,6 +7,7 @@ import { IoMdClose } from "react-icons/io";
 import { LuSendHorizontal } from "react-icons/lu";
 import { BsFillSendFill } from "react-icons/bs";
 import { GoDotFill } from "react-icons/go";
+import socket from "../Socket";
 
 const Chat = ({ senderId, receiverId }) => {
   const [messages, setMessages] = useState([]);
@@ -17,14 +18,12 @@ const Chat = ({ senderId, receiverId }) => {
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp?._seconds) return "";
-
     const date = new Date(timestamp._seconds * 1000);
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const formatDate = (timestamp) => {
     if (!timestamp?._seconds) return "";
-
     const date = new Date(timestamp._seconds * 1000);
     return date.toLocaleDateString([], {
       month: "short",
@@ -49,8 +48,8 @@ const Chat = ({ senderId, receiverId }) => {
       toast.error("Please enter a message or upload a file.");
       return;
     }
-    setLoading(true);
 
+    setLoading(true);
     try {
       let fileUrl = null;
       if (file) {
@@ -60,12 +59,14 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      await sendMessage({
+      const msg = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
-      });
+      };
 
+      await sendMessage(msg);
+      socket.emit("sendMessage", msg);
       setNewMessage("");
       fetchMessages();
     } catch (error) {
@@ -85,7 +86,20 @@ const Chat = ({ senderId, receiverId }) => {
 
   useEffect(() => {
     fetchMessages();
-  }, [fetchMessages]);
+
+    socket.on("receiveMessage", (msg) => {
+      if (
+        (msg.senderId === senderId.uid && msg.receiverId === receiverId.uid) ||
+        (msg.senderId === receiverId.uid && msg.receiverId === senderId.uid)
+      ) {
+        setMessages((prev) => [...prev, msg]);
+      }
+    });
+
+    return () => {
+      socket.off("receiveMessage");
+    };
+  }, [fetchMessages, senderId, receiverId]);
 
   return (
     <>
