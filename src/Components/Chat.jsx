@@ -88,6 +88,8 @@ const Chat = ({ senderId, receiverId }) => {
     fetchMessages();
 
     socket.on("receiveMessage", (msg) => {
+      console.log('Received message:', msg);
+      
       if (
         (msg.senderId === senderId.uid && msg.receiverId === receiverId.uid) ||
         (msg.senderId === receiverId.uid && msg.receiverId === senderId.uid)
