@@ -209,6 +209,9 @@ const Chat = ({ senderId, receiverId }) => {
                 const shouldShowDate = messageDate !== lastDisplayedDate;
                 lastDisplayedDate = messageDate;
 
+                const isSender = msg.senderId === senderId?.uid;
+                const messageContent = msg.message || msg.text || "";
+
                 return (
                   <div key={msg.tempId || msg._id || index}>
                     {shouldShowDate && (
@@ -219,28 +222,27 @@ const Chat = ({ senderId, receiverId }) => {
 
                     <div
                       className={`flex ${
-                        msg.senderId === senderId.uid
-                          ? "justify-end"
-                          : "justify-start"
+                        isSender ? "justify-end" : "justify-start"
                       }`}
                     >
                       <div
                         className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          msg.senderId === senderId.uid
+                          isSender
                             ? "bg-blue-500 text-white"
-                            : "bg-gray-200"
+                            : "bg-gray-200 text-black"
                         }`}
                       >
-                        {typeof msg.message === "string" &&
-                        msg.message.startsWith("http") ? (
+                        {typeof messageContent === "string" &&
+                        messageContent.startsWith("http") ? (
                           <img
-                            src={msg.message}
+                            src={messageContent}
                             alt="Uploaded"
                             className="max-w-xs rounded-md"
                           />
                         ) : (
-                          msg.message
+                          <div>{messageContent}</div>
                         )}
+
                         <span className="block text-right text-xs opacity-70 mt-1">
                           {formatTimestamp(msg.timestamp)}
                         </span>
