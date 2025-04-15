@@ -63,8 +63,7 @@ const Chat = ({ senderId, receiverId }) => {
     }
 
     setLoading(true);
-    const tempId = `temp-${currentTime}`;
-
+    const tempId = Date.now();
     try {
       let fileUrl = null;
       if (file) {
@@ -74,40 +73,29 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      if (!fileUrl && newMessage.trim() === "") {
-        toast.error("Cannot send an empty message");
-        setLoading(false);
-        return;
-      }
-
-      const tempMessage = {
-        senderId: senderId?.uid,
-        receiverId: receiverId?.uid,
+      const tempId = Date.now();
+      const msg = {
+        senderId: senderId.uid,
+        receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
         timestamp: { _seconds: Math.floor(currentTime / 1000) },
         tempId: tempId,
         isOptimistic: true,
-        isSender: true,
       };
 
-      setMessages((prev) => [...prev, tempMessage]);
+      setMessages((prev) => [...prev, msg]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
 
-      const response = await sendMessage(tempMessage);
-      const serverMessage = response.data;
+      const response = await sendMessage(msg);
+      const serverMsg = response.data;
 
       setMessages((prev) =>
-        prev.map((m) =>
-          m.tempId === tempId ? { ...serverMessage, isSender: true } : m
-        )
+        prev.map((m) => (m.tempId === tempId ? { ...serverMsg, tempId } : m))
       );
 
-      socket.emit("privateMessage", {
-        ...serverMessage,
-        to: receiverId?.uid,
-      });
+      socket.emit("sendMessage", serverMsg);
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
@@ -131,17 +119,9 @@ const Chat = ({ senderId, receiverId }) => {
       setIsInputEmpty(false);
     },
   });
-  useEffect(() => {
-    const onConnect = () => {
-      setIsConnected(true);
-      if (senderId?.uid && receiverId?.uid) {
-        socket.emit("joinRoom", {
-          senderId: senderId.uid,
-          receiverId: receiverId.uid,
-        });
-      }
-    };
 
+  useEffect(() => {
+    const onConnect = () => setIsConnected(true);
     const onDisconnect = () => setIsConnected(false);
     const onError = (error) => {
       console.error("Socket error:", error);
@@ -153,28 +133,28 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      if (
-        (msg.senderId === receiverId?.uid &&
-          msg.receiverId === senderId?.uid) ||
-        (msg.senderId === senderId?.uid && msg.receiverId === receiverId?.uid)
-      ) {
-        setMessages((prev) => {
-          const exists = prev.some(
-            (m) =>
-              (m._id && msg._id && m._id === msg._id) ||
-              (m.tempId && msg.tempId && m.tempId === msg.tempId)
-          );
-          return exists ? prev : [...prev, msg];
-        });
-      }
+      setMessages((prev) => {
+        const exists = prev.some(
+          (m) =>
+            (m.tempId && msg.tempId && m.tempId === msg.tempId) ||
+            (m._id && msg._id && m._id === msg._id) ||
+            (m.message === msg.message &&
+              m.senderId === msg.senderId &&
+              m.timestamp?._seconds === msg.timestamp?._seconds)
+        );
+
+        return exists ? prev : [...prev, msg];
+      });
     };
 
-    socket.on("privateMessage", handleReceiveMessage);
+    socket.on("receiveMessage", handleReceiveMessage);
+    fetchMessages();
+
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("error", onError);
-      socket.off("privateMessage", handleReceiveMessage);
+      socket.off("receiveMessage", handleReceiveMessage);
     };
   }, [senderId?.uid, receiverId?.uid, fetchMessages]);
 
@@ -225,26 +205,27 @@ const Chat = ({ senderId, receiverId }) => {
                 const shouldShowDate = messageDate !== lastDisplayedDate;
                 lastDisplayedDate = messageDate;
 
-                const isSender = msg.senderId === senderId.uid;
-                const isOptimistic = msg.isOptimistic && !msg._id;
-
                 return (
-                  <div key={msg._id || msg.tempId || index}>
+                  <div key={msg.tempId || msg._id || index}>
                     {shouldShowDate && (
                       <div className="text-center text-gray-500 text-xs my-3">
-                        {messageDate}
+                        {messageDate} - {formatTimestamp(msg.timestamp)}
                       </div>
                     )}
 
                     <div
                       className={`flex ${
-                        isSender ? "justify-end" : "justify-start"
+                        msg.senderId === senderId.uid
+                          ? "justify-end"
+                          : "justify-start"
                       }`}
                     >
                       <div
                         className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          isSender ? "bg-blue-500 text-white" : "bg-gray-200"
-                        } ${isOptimistic ? "opacity-80" : ""}`}
+                          msg.senderId === senderId.uid
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200"
+                        }`}
                       >
                         {typeof msg.message === "string" &&
                         msg.message.startsWith("http") ? (
