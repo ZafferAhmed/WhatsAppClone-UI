@@ -91,11 +91,14 @@ const Chat = ({ senderId, receiverId }) => {
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
+
       const response = await sendMessage(tempMessage);
       const serverMessage = response.data;
+
       setMessages((prev) =>
         prev.map((m) => (m.tempId === tempId ? serverMessage : m))
       );
+
       socket.emit("sendMessage", serverMessage);
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
@@ -134,19 +137,16 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      if (!msg.message || typeof msg.message !== "string") return;
-
-      setMessages((prev) => {
-        const exists = prev.some(
-          (m) =>
-            (m._id && msg._id && m._id === msg._id) ||
-            (m.tempId && msg.tempId && m.tempId === msg.tempId) ||
-            (m.timestamp?._seconds === msg.timestamp?._seconds &&
-              m.senderId === msg.senderId &&
-              m.message === msg.message)
-        );
-        return exists ? prev : [...prev, msg];
-      });
+      if (msg.receiverId === senderId.uid && msg.senderId === receiverId.uid) {
+        setMessages((prev) => {
+          const exists = prev.some(
+            (m) =>
+              (m._id && msg._id && m._id === msg._id) ||
+              (m.tempId && msg.tempId && m.tempId === msg.tempId)
+          );
+          return exists ? prev : [...prev, msg];
+        });
+      }
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
@@ -207,7 +207,7 @@ const Chat = ({ senderId, receiverId }) => {
                 const shouldShowDate = messageDate !== lastDisplayedDate;
                 lastDisplayedDate = messageDate;
 
-                const isSender = String(msg.senderId) === String(senderId?.uid);
+                const isSender = msg.senderId === senderId.uid;
                 const isOptimistic = msg.isOptimistic && !msg._id;
 
                 return (
@@ -235,12 +235,8 @@ const Chat = ({ senderId, receiverId }) => {
                             alt="Uploaded"
                             className="max-w-xs rounded-md"
                           />
-                        ) : msg.message && typeof msg.message === "string" ? (
-                          <span>{msg.message}</span>
                         ) : (
-                          <span className="italic text-gray-400">
-                            [No content]
-                          </span>
+                          msg.message
                         )}
                         <span className="block text-right text-xs opacity-70 mt-1">
                           {formatTimestamp(msg.timestamp)}
