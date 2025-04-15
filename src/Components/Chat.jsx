@@ -10,9 +10,6 @@ import { GoDotFill } from "react-icons/go";
 import socket from "../Socket";
 
 const Chat = ({ senderId, receiverId }) => {
-  console.log('senderId', senderId);
-  console.log('receiverId', receiverId);
-  
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [file, setFile] = useState(null);
@@ -83,36 +80,31 @@ const Chat = ({ senderId, receiverId }) => {
       }
 
       const tempMessage = {
-        senderId: senderId.uid,
-        receiverId: receiverId.uid,
+        senderId: senderId?.uid,
+        receiverId: receiverId?.uid,
         message: fileUrl || newMessage.trim(),
         timestamp: { _seconds: Math.floor(currentTime / 1000) },
         tempId: tempId,
         isOptimistic: true,
       };
 
-      // Add optimistic message immediately
       setMessages((prev) => [...prev, tempMessage]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
 
-      // Send to server
       const response = await sendMessage(tempMessage);
       const serverMessage = response.data;
 
-      // Replace optimistic message with server message
       setMessages((prev) =>
         prev.map((m) => (m.tempId === tempId ? serverMessage : m))
       );
 
-      // Emit socket event with server message
       socket.emit("privateMessage", {
         ...serverMessage,
-        to: receiverId.uid,
+        to: receiverId?.uid,
       });
     } catch (error) {
-      // Remove optimistic message if error occurs
       setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
     } finally {
@@ -139,15 +131,13 @@ const Chat = ({ senderId, receiverId }) => {
   useEffect(() => {
     const onConnect = () => {
       setIsConnected(true);
-      // Join private room when connected
       socket.emit("joinRoom", {
-        senderId: senderId.uid,
-        receiverId: receiverId.uid,
+        senderId: senderId?.uid,
+        receiverId: receiverId?.uid,
       });
     };
-    
+
     const onDisconnect = () => setIsConnected(false);
-    
     const onError = (error) => {
       console.error("Socket error:", error);
       toast.error("Connection error. Please refresh.");
@@ -158,13 +148,12 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      // Only add message if it's for this chat
       if (
-        (msg.senderId === receiverId.uid && msg.receiverId === senderId.uid) ||
-        (msg.senderId === senderId.uid && msg.receiverId === receiverId.uid)
+        (msg.senderId === receiverId?.uid &&
+          msg.receiverId === senderId?.uid) ||
+        (msg.senderId === senderId?.uid && msg.receiverId === receiverId?.uid)
       ) {
         setMessages((prev) => {
-          // Check if message already exists
           const exists = prev.some(
             (m) =>
               (m._id && msg._id && m._id === msg._id) ||
@@ -251,9 +240,7 @@ const Chat = ({ senderId, receiverId }) => {
                     >
                       <div
                         className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          isSender
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200"
+                          isSender ? "bg-blue-500 text-white" : "bg-gray-200"
                         } ${isOptimistic ? "opacity-80" : ""}`}
                       >
                         {typeof msg.message === "string" &&
