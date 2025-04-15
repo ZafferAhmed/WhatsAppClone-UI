@@ -73,6 +73,12 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
+      if (!fileUrl && newMessage.trim() === "") {
+        toast.error("Cannot send an empty message");
+        setLoading(false);
+        return;
+      }
+
       const tempMessage = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
@@ -129,11 +135,13 @@ const Chat = ({ senderId, receiverId }) => {
 
     const handleReceiveMessage = (msg) => {
       setMessages((prev) => {
-        // Check if message already exists (either by _id or tempId)
         const exists = prev.some(
           (m) =>
             (m._id && msg._id && m._id === msg._id) ||
-            (m.tempId && msg.tempId && m.tempId === msg.tempId)
+            (m.tempId && msg.tempId && m.tempId === msg.tempId) ||
+            (m.timestamp?._seconds === msg.timestamp?._seconds &&
+              m.senderId === msg.senderId &&
+              m.message === msg.message)
         );
         return exists ? prev : [...prev, msg];
       });
