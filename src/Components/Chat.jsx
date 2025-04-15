@@ -214,14 +214,14 @@ const Chat = ({ senderId, receiverId }) => {
                     )}
 
                     <div
-                      className={"flex"`${
+                      className={`flex ${
                         msg.senderId === senderId.uid
                           ? "justify-end"
                           : "justify-start"
                       }`}
                     >
                       <div
-                        className={"relative p-3 max-w-xs rounded-lg shadow-md text-sm"`${
+                        className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
                           msg.senderId === senderId.uid
                             ? "bg-blue-500 text-white"
                             : "bg-gray-200"
