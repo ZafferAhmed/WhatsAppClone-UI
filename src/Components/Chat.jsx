@@ -73,35 +73,31 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      const optimisticMessage = {
+      const tempId = Date.now();
+      const msg = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
         timestamp: { _seconds: Math.floor(currentTime / 1000) },
-        tempId,
+        tempId: tempId,
         isOptimistic: true,
       };
 
-      setMessages((prev) => [...prev, optimisticMessage]);
+      setMessages((prev) => [...prev, msg]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
 
-      const response = await sendMessage(optimisticMessage);
-      const serverMsg = { ...response.data, tempId };
+      const response = await sendMessage(msg);
+      const serverMsg = response.data;
 
-      // Replace optimistic message with server message
       setMessages((prev) =>
-        prev.map((msg) => (msg.tempId === tempId ? serverMsg : msg))
+        prev.map((m) => (m.tempId === tempId ? { ...serverMsg, tempId } : m))
       );
 
-      // Emit to other clients only
-      if (socket && socket.connected) {
-        socket.emit("sendMessage", serverMsg);
-      }
+      socket.emit("sendMessage", serverMsg);
     } catch (error) {
-      // Remove the failed optimistic message
-      setMessages((prev) => prev.filter((msg) => msg.tempId !== tempId));
+      setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
     } finally {
       setLoading(false);
@@ -209,9 +205,6 @@ const Chat = ({ senderId, receiverId }) => {
                 const shouldShowDate = messageDate !== lastDisplayedDate;
                 lastDisplayedDate = messageDate;
 
-                const isSender = msg.senderId === senderId?.uid;
-                const messageContent = msg.message || msg.text || "";
-
                 return (
                   <div key={msg.tempId || msg._id || index}>
                     {shouldShowDate && (
@@ -221,28 +214,29 @@ const Chat = ({ senderId, receiverId }) => {
                     )}
 
                     <div
-                      className={`flex ${
-                        isSender ? "justify-end" : "justify-start"
+                      className={"flex"`${
+                        msg.senderId === senderId.uid
+                          ? "justify-end"
+                          : "justify-start"
                       }`}
                     >
                       <div
-                        className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          isSender
+                        className={"relative p-3 max-w-xs rounded-lg shadow-md text-sm"`${
+                          msg.senderId === senderId.uid
                             ? "bg-blue-500 text-white"
-                            : "bg-gray-200 text-black"
+                            : "bg-gray-200"
                         }`}
                       >
-                        {typeof messageContent === "string" &&
-                        messageContent.startsWith("http") ? (
+                        {typeof msg.message === "string" &&
+                        msg.message.startsWith("http") ? (
                           <img
-                            src={messageContent}
+                            src={msg.message}
                             alt="Uploaded"
                             className="max-w-xs rounded-md"
                           />
                         ) : (
-                          <div>{messageContent}</div>
+                          msg.message
                         )}
-
                         <span className="block text-right text-xs opacity-70 mt-1">
                           {formatTimestamp(msg.timestamp)}
                         </span>
