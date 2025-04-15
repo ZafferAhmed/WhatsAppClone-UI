@@ -227,8 +227,7 @@ const Chat = ({ senderId, receiverId }) => {
                             : "bg-gray-200"
                         }`}
                       >
-                        {typeof msg.message === "string" &&
-                        msg.message.startsWith("http") ? (
+                        {msg.message.startsWith("http") ? (
                           <img
                             src={msg.message}
                             alt="Uploaded"
@@ -308,5 +307,4 @@ const Chat = ({ senderId, receiverId }) => {
     </>
   );
 };
-
 export default Chat;
