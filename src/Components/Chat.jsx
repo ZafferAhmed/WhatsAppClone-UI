@@ -63,7 +63,7 @@ const Chat = ({ senderId, receiverId }) => {
     }
 
     setLoading(true);
-    const tempId = Date.now().toString();
+    const tempId = `temp-${Date.now()}`;
     try {
       let fileUrl = null;
       if (file) {
@@ -73,7 +73,7 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      const msg = {
+      const tempMessage = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
@@ -81,18 +81,16 @@ const Chat = ({ senderId, receiverId }) => {
         tempId: tempId,
         isOptimistic: true,
       };
-
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => [...prev, tempMessage]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
-
-      const response = await sendMessage(msg);
-      const serverMsg = response.data;
-
+      const response = await sendMessage(tempMessage);
+      const serverMessage = response.data;
       setMessages((prev) =>
-        prev.map((m) => (m.tempId === tempId ? serverMsg : m))
+        prev.map((m) => (m.tempId === tempId ? serverMessage : m))
       );
+      socket.emit("sendMessage", serverMessage);
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
@@ -130,18 +128,15 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      if (msg.senderId === receiverId.uid) {
-        setMessages((prev) => {
-          const exists = prev.some(
-            (m) =>
-              (m._id && msg._id && m._id === msg._id) ||
-              (m.message === msg.message &&
-                m.senderId === msg.senderId &&
-                m.timestamp?._seconds === msg.timestamp?._seconds)
-          );
-          return exists ? prev : [...prev, msg];
-        });
-      }
+      setMessages((prev) => {
+        // Check if message already exists (either by _id or tempId)
+        const exists = prev.some(
+          (m) =>
+            (m._id && msg._id && m._id === msg._id) ||
+            (m.tempId && msg.tempId && m.tempId === msg.tempId)
+        );
+        return exists ? prev : [...prev, msg];
+      });
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
@@ -202,6 +197,9 @@ const Chat = ({ senderId, receiverId }) => {
                 const shouldShowDate = messageDate !== lastDisplayedDate;
                 lastDisplayedDate = messageDate;
 
+                const isSender = msg.senderId === senderId.uid;
+                const isOptimistic = msg.isOptimistic && !msg._id;
+
                 return (
                   <div key={msg._id || msg.tempId || index}>
                     {shouldShowDate && (
@@ -212,17 +210,13 @@ const Chat = ({ senderId, receiverId }) => {
 
                     <div
                       className={`flex ${
-                        msg.senderId === senderId.uid
-                          ? "justify-end"
-                          : "justify-start"
+                        isSender ? "justify-end" : "justify-start"
                       }`}
                     >
                       <div
                         className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          msg.senderId === senderId.uid
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200"
-                        }`}
+                          isSender ? "bg-blue-500 text-white" : "bg-gray-200"
+                        } ${isOptimistic ? "opacity-80" : ""}`}
                       >
                         {typeof msg.message === "string" &&
                         msg.message.startsWith("http") ? (
