@@ -63,7 +63,7 @@ const Chat = ({ senderId, receiverId }) => {
     }
 
     setLoading(true);
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${currentTime}`;
     try {
       let fileUrl = null;
       if (file) {
@@ -87,20 +87,29 @@ const Chat = ({ senderId, receiverId }) => {
         tempId: tempId,
         isOptimistic: true,
       };
+
+      // Add optimistic message immediately
       setMessages((prev) => [...prev, tempMessage]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
 
+      // Send to server
       const response = await sendMessage(tempMessage);
       const serverMessage = response.data;
 
+      // Replace optimistic message with server message
       setMessages((prev) =>
         prev.map((m) => (m.tempId === tempId ? serverMessage : m))
       );
 
-      socket.emit("sendMessage", serverMessage);
+      // Emit socket event with server message
+      socket.emit("privateMessage", {
+        ...serverMessage,
+        to: receiverId.uid,
+      });
     } catch (error) {
+      // Remove optimistic message if error occurs
       setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
     } finally {
@@ -125,8 +134,17 @@ const Chat = ({ senderId, receiverId }) => {
   });
 
   useEffect(() => {
-    const onConnect = () => setIsConnected(true);
+    const onConnect = () => {
+      setIsConnected(true);
+      // Join private room when connected
+      socket.emit("joinRoom", {
+        senderId: senderId.uid,
+        receiverId: receiverId.uid,
+      });
+    };
+    
     const onDisconnect = () => setIsConnected(false);
+    
     const onError = (error) => {
       console.error("Socket error:", error);
       toast.error("Connection error. Please refresh.");
@@ -137,8 +155,13 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      if (msg.receiverId === senderId.uid && msg.senderId === receiverId.uid) {
+      // Only add message if it's for this chat
+      if (
+        (msg.senderId === receiverId.uid && msg.receiverId === senderId.uid) ||
+        (msg.senderId === senderId.uid && msg.receiverId === receiverId.uid)
+      ) {
         setMessages((prev) => {
+          // Check if message already exists
           const exists = prev.some(
             (m) =>
               (m._id && msg._id && m._id === msg._id) ||
@@ -149,14 +172,14 @@ const Chat = ({ senderId, receiverId }) => {
       }
     };
 
-    socket.on("receiveMessage", handleReceiveMessage);
+    socket.on("privateMessage", handleReceiveMessage);
     fetchMessages();
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("error", onError);
-      socket.off("receiveMessage", handleReceiveMessage);
+      socket.off("privateMessage", handleReceiveMessage);
     };
   }, [senderId?.uid, receiverId?.uid, fetchMessages]);
 
@@ -225,7 +248,9 @@ const Chat = ({ senderId, receiverId }) => {
                     >
                       <div
                         className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          isSender ? "bg-blue-500 text-white" : "bg-gray-200"
+                          isSender
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200"
                         } ${isOptimistic ? "opacity-80" : ""}`}
                       >
                         {typeof msg.message === "string" &&
