@@ -63,7 +63,7 @@ const Chat = ({ senderId, receiverId }) => {
     }
 
     setLoading(true);
-    const tempId = Date.now();
+    const tempId = Date.now().toString();
     try {
       let fileUrl = null;
       if (file) {
@@ -73,7 +73,6 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      const tempId = Date.now();
       const msg = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
@@ -92,10 +91,8 @@ const Chat = ({ senderId, receiverId }) => {
       const serverMsg = response.data;
 
       setMessages((prev) =>
-        prev.map((m) => (m.tempId === tempId ? { ...serverMsg, tempId } : m))
+        prev.map((m) => (m.tempId === tempId ? serverMsg : m))
       );
-
-      socket.emit("sendMessage", serverMsg);
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
@@ -133,18 +130,18 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      setMessages((prev) => {
-        const exists = prev.some(
-          (m) =>
-            (m.tempId && msg.tempId && m.tempId === msg.tempId) ||
-            (m._id && msg._id && m._id === msg._id) ||
-            (m.message === msg.message &&
-              m.senderId === msg.senderId &&
-              m.timestamp?._seconds === msg.timestamp?._seconds)
-        );
-
-        return exists ? prev : [...prev, msg];
-      });
+      if (msg.senderId === receiverId.uid) {
+        setMessages((prev) => {
+          const exists = prev.some(
+            (m) =>
+              (m._id && msg._id && m._id === msg._id) ||
+              (m.message === msg.message &&
+                m.senderId === msg.senderId &&
+                m.timestamp?._seconds === msg.timestamp?._seconds)
+          );
+          return exists ? prev : [...prev, msg];
+        });
+      }
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
@@ -206,10 +203,10 @@ const Chat = ({ senderId, receiverId }) => {
                 lastDisplayedDate = messageDate;
 
                 return (
-                  <div key={msg.tempId || msg._id || index}>
+                  <div key={msg._id || msg.tempId || index}>
                     {shouldShowDate && (
                       <div className="text-center text-gray-500 text-xs my-3">
-                        {messageDate} - {formatTimestamp(msg.timestamp)}
+                        {messageDate}
                       </div>
                     )}
 
@@ -227,7 +224,8 @@ const Chat = ({ senderId, receiverId }) => {
                             : "bg-gray-200"
                         }`}
                       >
-                        {msg.message.startsWith("http") ? (
+                        {typeof msg.message === "string" &&
+                        msg.message.startsWith("http") ? (
                           <img
                             src={msg.message}
                             alt="Uploaded"
@@ -307,4 +305,5 @@ const Chat = ({ senderId, receiverId }) => {
     </>
   );
 };
+
 export default Chat;
