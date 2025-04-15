@@ -73,35 +73,31 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      const optimisticMessage = {
+      const tempId = Date.now();
+      const msg = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
         timestamp: { _seconds: Math.floor(currentTime / 1000) },
-        tempId,
+        tempId: tempId,
         isOptimistic: true,
       };
 
-      setMessages((prev) => [...prev, optimisticMessage]);
+      setMessages((prev) => [...prev, msg]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
 
-      const response = await sendMessage(optimisticMessage);
-      const serverMsg = { ...response.data, tempId };
+      const response = await sendMessage(msg);
+      const serverMsg = response.data;
 
-      // Replace optimistic message with server message
       setMessages((prev) =>
-        prev.map((msg) => (msg.tempId === tempId ? serverMsg : msg))
+        prev.map((m) => (m.tempId === tempId ? { ...serverMsg, tempId } : m))
       );
 
-      // Emit to other clients only
-      if (socket && socket.connected) {
-        socket.emit("sendMessage", serverMsg);
-      }
+      socket.emit("sendMessage", serverMsg);
     } catch (error) {
-      // Remove the failed optimistic message
-      setMessages((prev) => prev.filter((msg) => msg.tempId !== tempId));
+      setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
     } finally {
       setLoading(false);
@@ -137,12 +133,14 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
-      console.log("Received message:", msg);
       setMessages((prev) => {
         const exists = prev.some(
           (m) =>
-            m._id === msg._id || // Match by MongoDB ID
-            (m.tempId && msg.tempId && m.tempId === msg.tempId) // Match by tempId
+            (m.tempId && msg.tempId && m.tempId === msg.tempId) ||
+            (m._id && msg._id && m._id === msg._id) ||
+            (m.message === msg.message &&
+              m.senderId === msg.senderId &&
+              m.timestamp?._seconds === msg.timestamp?._seconds)
         );
 
         return exists ? prev : [...prev, msg];
@@ -217,16 +215,16 @@ const Chat = ({ senderId, receiverId }) => {
 
                     <div
                       className={`flex ${
-                        msg.senderId === senderId.uid
+                        msg.senderId === senderId?.uid
                           ? "justify-end"
                           : "justify-start"
                       }`}
                     >
                       <div
                         className={`relative p-3 max-w-xs rounded-lg shadow-md text-sm ${
-                          msg.senderId === senderId.uid
+                          msg.senderId === senderId?.uid
                             ? "bg-blue-500 text-white"
-                            : "bg-gray-200"
+                            : "bg-gray-200 text-black"
                         }`}
                       >
                         {typeof msg.message === "string" &&
@@ -247,6 +245,7 @@ const Chat = ({ senderId, receiverId }) => {
                   </div>
                 );
               })}
+
               <div ref={messagesEndRef} />
             </div>
           )}
