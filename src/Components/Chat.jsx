@@ -73,31 +73,35 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      const tempId = Date.now();
-      const msg = {
+      const optimisticMessage = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
         message: fileUrl || newMessage.trim(),
         timestamp: { _seconds: Math.floor(currentTime / 1000) },
-        tempId: tempId,
+        tempId,
         isOptimistic: true,
       };
 
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => [...prev, optimisticMessage]);
       setNewMessage("");
       setIsInputEmpty(true);
       setLastSentTime(currentTime);
 
-      const response = await sendMessage(msg);
-      const serverMsg = response.data;
+      const response = await sendMessage(optimisticMessage);
+      const serverMsg = { ...response.data, tempId };
 
+      // Replace optimistic message with server message
       setMessages((prev) =>
-        prev.map((m) => (m.tempId === tempId ? { ...serverMsg, tempId } : m))
+        prev.map((msg) => (msg.tempId === tempId ? serverMsg : msg))
       );
 
-      socket.emit("sendMessage", serverMsg);
+      // Emit to other clients only
+      if (socket && socket.connected) {
+        socket.emit("sendMessage", serverMsg);
+      }
     } catch (error) {
-      setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
+      // Remove the failed optimistic message
+      setMessages((prev) => prev.filter((msg) => msg.tempId !== tempId));
       toast.error("Error sending message: " + error.message);
     } finally {
       setLoading(false);
@@ -227,7 +231,8 @@ const Chat = ({ senderId, receiverId }) => {
                             : "bg-gray-200"
                         }`}
                       >
-                        {msg.message.startsWith("http") ? (
+                        {typeof msg.message === "string" &&
+                        msg.message.startsWith("http") ? (
                           <img
                             src={msg.message}
                             alt="Uploaded"
