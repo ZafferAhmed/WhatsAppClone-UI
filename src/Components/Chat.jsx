@@ -134,6 +134,8 @@ const Chat = ({ senderId, receiverId }) => {
     socket.on("error", onError);
 
     const handleReceiveMessage = (msg) => {
+      if (!msg.message || typeof msg.message !== "string") return;
+
       setMessages((prev) => {
         const exists = prev.some(
           (m) =>
@@ -205,7 +207,7 @@ const Chat = ({ senderId, receiverId }) => {
                 const shouldShowDate = messageDate !== lastDisplayedDate;
                 lastDisplayedDate = messageDate;
 
-                const isSender = msg.senderId === senderId.uid;
+                const isSender = String(msg.senderId) === String(senderId?.uid);
                 const isOptimistic = msg.isOptimistic && !msg._id;
 
                 return (
@@ -233,8 +235,12 @@ const Chat = ({ senderId, receiverId }) => {
                             alt="Uploaded"
                             className="max-w-xs rounded-md"
                           />
+                        ) : msg.message && typeof msg.message === "string" ? (
+                          <span>{msg.message}</span>
                         ) : (
-                          msg.message
+                          <span className="italic text-gray-400">
+                            [No content]
+                          </span>
                         )}
                         <span className="block text-right text-xs opacity-70 mt-1">
                           {formatTimestamp(msg.timestamp)}
