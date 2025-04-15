@@ -10,6 +10,9 @@ import { GoDotFill } from "react-icons/go";
 import socket from "../Socket";
 
 const Chat = ({ senderId, receiverId }) => {
+  console.log('senderId', senderId);
+  console.log('receiverId', receiverId);
+  
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [file, setFile] = useState(null);
