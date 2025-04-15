@@ -64,6 +64,7 @@ const Chat = ({ senderId, receiverId }) => {
 
     setLoading(true);
     const tempId = `temp-${currentTime}`;
+
     try {
       let fileUrl = null;
       if (file) {
@@ -86,6 +87,7 @@ const Chat = ({ senderId, receiverId }) => {
         timestamp: { _seconds: Math.floor(currentTime / 1000) },
         tempId: tempId,
         isOptimistic: true,
+        isSender: true,
       };
 
       setMessages((prev) => [...prev, tempMessage]);
@@ -97,7 +99,9 @@ const Chat = ({ senderId, receiverId }) => {
       const serverMessage = response.data;
 
       setMessages((prev) =>
-        prev.map((m) => (m.tempId === tempId ? serverMessage : m))
+        prev.map((m) =>
+          m.tempId === tempId ? { ...serverMessage, isSender: true } : m
+        )
       );
 
       socket.emit("privateMessage", {
@@ -127,14 +131,15 @@ const Chat = ({ senderId, receiverId }) => {
       setIsInputEmpty(false);
     },
   });
-
   useEffect(() => {
     const onConnect = () => {
       setIsConnected(true);
-      socket.emit("joinRoom", {
-        senderId: senderId?.uid,
-        receiverId: receiverId?.uid,
-      });
+      if (senderId?.uid && receiverId?.uid) {
+        socket.emit("joinRoom", {
+          senderId: senderId.uid,
+          receiverId: receiverId.uid,
+        });
+      }
     };
 
     const onDisconnect = () => setIsConnected(false);
@@ -165,8 +170,6 @@ const Chat = ({ senderId, receiverId }) => {
     };
 
     socket.on("privateMessage", handleReceiveMessage);
-    fetchMessages();
-
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
