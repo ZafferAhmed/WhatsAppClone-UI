@@ -41,7 +41,13 @@ const Chat = ({ senderId, receiverId }) => {
   const fetchMessages = useCallback(async () => {
     try {
       const response = await getMessages(senderId?.uid, receiverId?.uid);
-      setMessages(response.data);
+      setMessages(
+        response.data.map((msg) => ({
+          ...msg,
+          senderId: String(msg.senderId),
+          receiverId: String(msg.receiverId),
+        }))
+      );
     } catch (error) {
       toast.error("Error fetching messages: " + error.message);
     }
@@ -207,7 +213,7 @@ const Chat = ({ senderId, receiverId }) => {
 
                 return (
                   <div key={msg.tempId || msg._id || index}>
-                    {shouldShowDate && (
+                    {shouldShowDate.length > 0 && shouldShowDate && (
                       <div className="text-center text-gray-500 text-xs my-3">
                         {messageDate} - {formatTimestamp(msg.timestamp)}
                       </div>
@@ -215,7 +221,7 @@ const Chat = ({ senderId, receiverId }) => {
 
                     <div
                       className={`flex ${
-                        msg.senderId === senderId?.uid
+                        String(msg.senderId) === String(senderId?.uid)
                           ? "justify-end"
                           : "justify-start"
                       }`}
