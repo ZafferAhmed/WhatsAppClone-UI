@@ -80,7 +80,6 @@ const Chat = ({ senderId, receiverId }) => {
         setFilePreview(null);
       }
 
-      const tempId = Date.now();
       const msg = {
         senderId: senderId.uid,
         receiverId: receiverId.uid,
