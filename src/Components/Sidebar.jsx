@@ -46,7 +46,7 @@ const Sidebar = ({ currentUser, onUserClick, onClose }) => {
         <div className="flex items-center mb-6">
           <FaWhatsapp className="text-gray-500 text-3xl mr-2" />
           <h2 className="text-xl font-bold">
-            <span className="text-green-500 ">
+            <span className="text-green-500 capitalize">
               {currentUser?.displayName} &apos;s
             </span>
             <span> Chats</span>
