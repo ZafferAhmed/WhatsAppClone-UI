@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { sendMessage, getMessages, uploadFile } from "../Services/API";
 import { useDropzone } from "react-dropzone";
@@ -10,6 +11,12 @@ import { GoDotFill } from "react-icons/go";
 import socket from "../Socket";
 
 const Chat = ({ senderId, receiverId }) => {
+  console.log(
+    "senderId from Chat",
+    senderId,
+    "receiverId from Chat",
+    receiverId
+  );
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [file, setFile] = useState(null);
@@ -145,6 +152,9 @@ const Chat = ({ senderId, receiverId }) => {
 
         return exists ? prev : [...prev, msg];
       });
+      console.log("Received message:", msg);
+      console.log("Received from socket:", messages);
+      console.log("Received from socket:", senderId?.uid, receiverId?.uid);
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
