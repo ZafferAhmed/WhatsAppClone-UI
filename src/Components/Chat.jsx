@@ -181,7 +181,7 @@ const Chat = ({ senderId, receiverId }) => {
                 {receiverId.name.charAt(0).toUpperCase()}
               </div>
               <div className="ml-3 flex flex-col">
-                <div className="text-base font-semibold text-gray-900">
+                <div className="text-base font-semibold text-gray-900 capitalize">
                   {receiverId.name}
                 </div>
                 <div className="text-xs font-medium flex items-center">

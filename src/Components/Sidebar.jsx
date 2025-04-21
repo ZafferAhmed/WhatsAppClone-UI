@@ -66,7 +66,7 @@ const Sidebar = ({ currentUser, onUserClick, onClose }) => {
               <div className="h-10 w-10 bg-gray-700 rounded-full flex items-center justify-center text-white">
                 {user.name.charAt(0).toUpperCase()}
               </div>
-              <span className="flex-1">{user.name}</span>
+              <span className="flex-1 capitalize">{user.name}</span>
               <span
                 className={`w-3 h-3 rounded-full ${
                   user.online ? "bg-green-400" : "bg-gray-500"
